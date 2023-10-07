@@ -175,7 +175,7 @@ install-client:
 	cd fittrackee_client && $(NPM) install --prod $(NPM_ARGS)
 
 install-client-dev:
-	# NPM_ARGS="--ignore-engines", if errors with Node latest version
+	NPM_ARGS="--ignore-engines"
 	cd fittrackee_client && $(NPM) install $(NPM_ARGS)
 
 install-dev: install-client-dev install-python-dev
