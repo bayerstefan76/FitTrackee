@@ -38,6 +38,11 @@ from .utils.gpx import (
     extract_segment_from_gpx_file,
     get_chart_data,
 )
+from .utils.fit import(
+    WorkoutFitException,
+    extract_segment_from_fit_file,
+    get_fit_chart_data
+)
 from .utils.short_id import decode_short_id
 from .utils.visibility import can_view_workout
 from .utils.workouts import (
@@ -426,17 +431,29 @@ def get_workout_data(
 
     try:
         absolute_gpx_filepath = get_absolute_file_path(workout.gpx)
+        extension = f".{absolute_gpx_filepath.rsplit('.', 1)[1].lower()}"
         chart_data_content: Optional[List] = []
         if data_type == 'chart_data':
-            chart_data_content = get_chart_data(
-                absolute_gpx_filepath, segment_id
-            )
+            if extension == ".gpx":
+                chart_data_content = get_chart_data(
+                    absolute_gpx_filepath, segment_id
+                )
+            elif extension == ".fit":
+                chart_data_content = get_fit_chart_data(
+                    absolute_gpx_filepath, segment_id
+                )
         else:  # data_type == 'gpx'
-            with open(absolute_gpx_filepath, encoding='utf-8') as f:
-                gpx_content = f.read()
+            if extension == ".gpx":
+                with open(absolute_gpx_filepath, encoding='utf-8') as f:
+                    gpx_content = f.read()
+                    if segment_id is not None:
+                        gpx_segment_content = extract_segment_from_gpx_file(
+                            gpx_content, segment_id
+                        )
+            elif extension == ".fit":
                 if segment_id is not None:
-                    gpx_segment_content = extract_segment_from_gpx_file(
-                        gpx_content, segment_id
+                    gpx_segment_content = extract_segment_from_fit_file(
+                        absolute_gpx_filepath, segment_id
                     )
     except WorkoutGPXException as e:
         appLog.error(e.message)

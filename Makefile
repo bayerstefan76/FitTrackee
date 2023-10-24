@@ -171,7 +171,7 @@ init-db:
 install: install-client install-python
 
 install-client:
-	# NPM_ARGS="--ignore-engines", if errors with Node latest version
+	NPM_ARGS="--ignore-engines", if errors with Node latest version
 	cd fittrackee_client && $(NPM) install --prod $(NPM_ARGS)
 
 install-client-dev:

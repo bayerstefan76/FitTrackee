@@ -48,3 +48,7 @@ class BaseWeather(ABC):
             return None
 
         return self._get_data(point.latitude, point.longitude, point.time)
+
+    def get_weather(self, latitude: float, longitude: float, time: datetime) -> Optional[Dict]:
+
+        return self._get_data(latitude, longitude, time)

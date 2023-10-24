@@ -15,9 +15,10 @@ from fittrackee import appLog, db
 from fittrackee.files import get_absolute_file_path
 from fittrackee.users.models import User, UserSportPreference
 
-from ..exceptions import InvalidGPXException, WorkoutException
+from ..exceptions import InvalidGPXException, WorkoutException, InvalidFitException
 from ..models import Sport, Workout, WorkoutSegment
 from .gpx import get_gpx_info
+from .fit import get_fit_info
 from .maps import generate_map, get_map_hash
 
 
@@ -185,9 +186,16 @@ def update_workout(workout: Workout) -> Workout:
     """
     Update workout data from gpx file
     """
-    gpx_data, _, _ = get_gpx_info(
-        get_absolute_file_path(workout.gpx), False, False
-    )
+
+    extension = f".{get_absolute_file_path(workout.gpx).rsplit('.', 1)[1].lower()}"
+    if extension == ".gpx":
+        gpx_data, _, _ = get_gpx_info(
+            get_absolute_file_path(workout.gpx), False, False
+        )
+    elif extension == ".fit":
+        gpx_data, _, _ = get_fit_info(
+            get_absolute_file_path(workout.gpx), False, False
+        )
     updated_workout = update_workout_data(workout, gpx_data)
     updated_workout.duration = gpx_data['duration']
     updated_workout.distance = gpx_data['distance']
@@ -290,7 +298,7 @@ def delete_files(
         appLog.error('Unable to delete files after processing error.')
 
 
-def process_one_gpx_file(
+def process_one_workout_file(
     params: Dict, filename: str, stopped_speed_threshold: float
 ) -> Workout:
     """
@@ -298,13 +306,19 @@ def process_one_gpx_file(
     """
     absolute_gpx_filepath = None
     absolute_map_filepath = None
+    extension = f".{filename.rsplit('.', 1)[1].lower()}"
     try:
         auth_user = params['auth_user']
-        gpx_data, map_data, weather_data = get_gpx_info(
-            gpx_file=params['file_path'],
-            stopped_speed_threshold=stopped_speed_threshold,
-            use_raw_gpx_speed=auth_user.use_raw_gpx_speed,
-        )
+        if extension == ".fit":
+            gpx_data, map_data, weather_data = get_fit_info(
+                params['file_path'],
+            )
+        elif extension == ".gpx":
+            gpx_data, map_data, weather_data = get_gpx_info(
+                gpx_file=params['file_path'],
+                stopped_speed_threshold=stopped_speed_threshold,
+                use_raw_gpx_speed=auth_user.use_raw_gpx_speed,
+            )
         workout_date, _ = get_workout_datetime(
             workout_date=gpx_data['start'],
             date_str_format=None if gpx_data else '%Y-%m-%d %H:%M',
@@ -334,6 +348,9 @@ def process_one_gpx_file(
     except InvalidGPXException as e:
         delete_files(absolute_gpx_filepath, absolute_map_filepath)
         raise WorkoutException('error', str(e))
+    except InvalidFitException as e:
+        delete_files(absolute_gpx_filepath, absolute_map_filepath)
+        raise WorkoutException('error', str(e))
     except Exception as e:
         delete_files(absolute_gpx_filepath, absolute_map_filepath)
         raise WorkoutException('error', 'error during gpx processing', e)
@@ -361,7 +378,7 @@ def process_one_gpx_file(
         raise WorkoutException('error', 'error when saving workout', e)
 
 
-def is_gpx_file(filename: str) -> bool:
+def is_workout_file(filename: str) -> bool:
     return (
         '.' in filename
         and filename.rsplit('.', 1)[1].lower()
@@ -381,7 +398,7 @@ def process_zip_archive(
         gpx_files_count = 0
         files_with_invalid_size_count = 0
         for zip_info in zip_ref.infolist():
-            if is_gpx_file(zip_info.filename):
+            if is_workout_file(zip_info.filename):
                 gpx_files_count += 1
                 if zip_info.file_size > max_file_size:
                     files_with_invalid_size_count += 1
@@ -403,11 +420,11 @@ def process_zip_archive(
     new_workouts = []
 
     for gpx_file in os.listdir(extract_dir):
-        if is_gpx_file(gpx_file):
+        if is_workout_file(gpx_file):
             file_path = os.path.join(extract_dir, gpx_file)
             params = common_params
             params['file_path'] = file_path
-            new_workout = process_one_gpx_file(
+            new_workout = process_one_workout_file(
                 params, gpx_file, stopped_speed_threshold
             )
             new_workouts.append(new_workout)
@@ -455,10 +472,10 @@ def process_files(
         workout_file.save(file_path)
     except Exception as e:
         raise WorkoutException('error', 'Error during workout file save.', e)
-
-    if extension == ".gpx":
+    print(extension)
+    if extension == ".gpx" or extension == ".fit":
         return [
-            process_one_gpx_file(
+            process_one_workout_file(
                 common_params,
                 filename,
                 stopped_speed_threshold,
