@@ -455,6 +455,10 @@ def get_workout_data(
                     gpx_segment_content = extract_segment_from_fit_file(
                         absolute_gpx_filepath, segment_id
                     )
+                else:
+                    gpx_content = extract_segment_from_fit_file(
+                        absolute_gpx_filepath
+                    )
     except WorkoutGPXException as e:
         appLog.error(e.message)
         if e.status == 'not found':
